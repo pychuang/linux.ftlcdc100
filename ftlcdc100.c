@@ -19,7 +19,6 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-
 #include <linux/kernel.h>
 #include <linux/platform_device.h>
 #include <linux/dma-mapping.h>
@@ -35,7 +34,15 @@
  */
 #define LC_CLK	AHB_CLK_IN
 
-#define NUMBER_OF_BUFFERS	2
+/*
+ * Andoird uses a virtual display twice the size of the physical screen and
+ * use fb_pan_display() to achieve double buffering.
+ */
+#define CONFIG_NUMBER_OF_BUFFERS	2
+
+#undef CONFIG_SHARP_LQ057Q3DC02
+#define CONFIG_AUO_A036QN01_CPLD
+
 /* 
  * This structure defines the hardware state of the graphics card. Normally
  * you place this in a header file in linux/include/video. This file usually
@@ -66,12 +73,30 @@ static struct fb_fix_screeninfo ftlcdc100_default_fix __devinitdata = {
  * It is only used in ftlcdc100_probe, so mark it as __devinitdata
  */
 
-/* AUO_A036QN01_CPLD */
+#ifdef CONFIG_SHARP_LQ057Q3DC02
 static struct fb_var_screeninfo ftlcdc100_default_var __devinitdata = {
 	.xres		= 320,
 	.yres		= 240,
 	.xres_virtual	= 320,
-	.yres_virtual	= 240 * NUMBER_OF_BUFFERS,
+	.yres_virtual	= 240 * CONFIG_NUMBER_OF_BUFFERS,
+	.bits_per_pixel	= 16,
+	.pixclock	= 171521,
+	.left_margin	= 17,
+	.right_margin	= 17,
+	.upper_margin	= 7,
+	.lower_margin	= 15,
+	.hsync_len	= 17,
+	.vsync_len	= 1,
+	.vmode		= FB_VMODE_NONINTERLACED,
+	.sync		= FB_SYNC_VERT_HIGH_ACT,
+};
+#endif
+#ifdef CONFIG_AUO_A036QN01_CPLD
+static struct fb_var_screeninfo ftlcdc100_default_var __devinitdata = {
+	.xres		= 320,
+	.yres		= 240,
+	.xres_virtual	= 320,
+	.yres_virtual	= 240 * CONFIG_NUMBER_OF_BUFFERS,
 	.bits_per_pixel	= 16,
 	.pixclock	= 171521,
 	.left_margin	= 44,
@@ -83,6 +108,7 @@ static struct fb_var_screeninfo ftlcdc100_default_var __devinitdata = {
 	.vmode		= FB_VMODE_NONINTERLACED,
 	.sync		= 0,
 };
+#endif
 
 /*
  * Modern graphical hardware not only supports pipelines but some 
