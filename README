@@ -1,0 +1,51 @@
+This package includes:
+
+* FTLCDC100 driver
+
+Usage:
+
+* put the following code in your platform-dpendent initialization sequence.
+------------------------>8-------------------------->8------------------------
+static struct resource ftlcdc100_resources[] = {
+	{
+		.start	= LCD_FTLCDC100_0_PA_BASE,
+		.end	= LCD_FTLCDC100_0_PA_LIMIT,
+		.flags	= IORESOURCE_MEM,
+	}, {
+		.start	= LCD_FTLCDC100_0_IRQ,
+		.end	= LCD_FTLCDC100_0_IRQ,
+		.flags	= IORESOURCE_IRQ,
+	},
+};
+
+static struct platform_device ftlcdc100_device = {
+	.name		= "ftlcdc100",
+	.id		= 0,
+	.num_resources	= ARRAY_SIZE(ftlcdc100_resources),
+	.resource	= ftlcdc100_resources,
+};
+
+platform_device_register(&ftlcdc100_device);
+------------------------>8-------------------------->8------------------------
+
+* make sure the following config options are set
+
+CONFIG_FB=y
+CONFIG_FB_CFB_FILLRECT=y
+CONFIG_FB_CFB_COPYAREA=y
+CONFIG_FB_CFB_IMAGEBLIT=y
+
+(1) insert modules
+
+$ insmod ftlcdc100.ko
+
+(2) find out the dynamically create major/minor number of fb0 device file
+
+$ cat /sys/class/graphics/fb0/dev
+29:0
+
+(3) create device files
+
+$ mknod /dev/fb0 c 29 0
+
+
