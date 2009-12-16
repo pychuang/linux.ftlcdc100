@@ -132,29 +132,6 @@ static struct fb_var_screeninfo ftlcdc100_default_var __devinitdata = {
 };
 #endif
 
-/*
- * Modern graphical hardware not only supports pipelines but some 
- * also support multiple monitors where each display can have its  
- * its own unique data. In this case each display could be  
- * represented by a separate framebuffer device thus a separate 
- * struct fb_info. Now the struct xxx_par represents the graphics
- * hardware state thus only one exist per card. In this case the 
- * struct xxx_par for each graphics card would be shared between 
- * every struct fb_info that represents a framebuffer on that card. 
- * This allows when one display changes it video resolution (info->var) 
- * the other displays know instantly. Each display can always be
- * aware of the entire hardware state that affects it because they share
- * the same xxx_par struct. The other side of the coin is multiple
- * graphics cards that pass data around until it is finally displayed
- * on one monitor. Such examples are the voodoo 1 cards and high end
- * NUMA graphics servers. For this case we have a bunch of pars, each
- * one that represents a graphics state, that belong to one struct 
- * fb_info. Their you would want to have *par point to a array of device
- * states and have each struct fb_ops function deal with all those 
- * states. I hope this covers every possible hardware design. If not
- * feel free to send your ideas at jsimmons@users.sf.net 
- */
-
 /******************************************************************************
  * interrupt handler
  *****************************************************************************/
