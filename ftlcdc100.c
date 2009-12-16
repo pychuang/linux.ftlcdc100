@@ -40,8 +40,12 @@
  */
 #define CONFIG_NUMBER_OF_BUFFERS	2
 
+/*
+ * Select a panel configuration
+ */
 #undef CONFIG_SHARP_LQ057Q3DC02
 #define CONFIG_AUO_A036QN01_CPLD
+#undef CONFIG_PRIME_VIEW_PD035VX2
 
 /* 
  * This structure defines the hardware state of the graphics card. Normally
@@ -105,6 +109,24 @@ static struct fb_var_screeninfo ftlcdc100_default_var __devinitdata = {
 	.lower_margin	= 8,
 	.hsync_len	= 21,
 	.vsync_len	= 3,
+	.vmode		= FB_VMODE_NONINTERLACED,
+	.sync		= 0,
+};
+#endif
+#ifdef CONFIG_PRIME_VIEW_PD035VX2
+static struct fb_var_screeninfo ftlcdc100_default_var __devinitdata = {
+	.xres		= 640,
+	.yres		= 480,
+	.xres_virtual	= 640,
+	.yres_virtual	= 480 * CONFIG_NUMBER_OF_BUFFERS,
+	.bits_per_pixel	= 16,
+	.pixclock	= 171521,
+	.left_margin	= 44,
+	.right_margin	= 20,
+	.upper_margin	= 16,
+	.lower_margin	= 16,
+	.hsync_len	= 100,
+	.vsync_len	= 19,
 	.vmode		= FB_VMODE_NONINTERLACED,
 	.sync		= 0,
 };
