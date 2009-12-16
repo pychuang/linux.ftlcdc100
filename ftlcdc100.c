@@ -319,7 +319,7 @@ static int ftlcdc100_check_var(struct fb_var_screeninfo *var,
  * This function is also used to recover/restore the hardware to a
  * known working state.
  *
- * xxxfb_check_var is always called before xxxfb_set_par to ensure that
+ * fb_check_var is always called before fb_set_par to ensure that
  * the contents of var is always valid.
  *
  * Again if you can't change the resolution you don't need this function.
@@ -328,20 +328,6 @@ static int ftlcdc100_check_var(struct fb_var_screeninfo *var,
  * a set_par might be needed to at least initialize the hardware to
  * a known working state, especially if it came back from another
  * process that also modifies the same hardware, such as X.
- *
- * If this is the case, a combination such as the following should work:
- *
- * static int xxxfb_check_var(struct fb_var_screeninfo *var,
- *                            struct fb_info *info)
- * {
- *         *var = info->var;
- *         return 0;
- * }
- *
- * static int xxxfb_set_par(struct fb_info *info)
- * {
- *         init your hardware here
- * }
  *
  * Returns negative errno on error, or zero on success.
  */
