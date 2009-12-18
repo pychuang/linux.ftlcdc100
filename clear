@@ -1,0 +1,2 @@
+rm -f *.ko *.o *.mod.c .*.cmd *.symvers *.order 
+rm -rf .tmp_versions
