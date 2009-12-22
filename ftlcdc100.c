@@ -58,6 +58,14 @@ struct ftlcdc100 {
 	struct resource *res;
 	void *base;
 	int irq;
+
+	/*
+	 * This pseudo_palette is used _only_ by fbcon, thus
+	 * it only contains 16 entries to match the number of colors supported
+	 * by the console. The pseudo_palette is used only if the visual is
+	 * in directcolor or truecolor mode.  With other visuals, the
+	 * pseudo_palette is not used. (This might change in the future.)
+	 */
 	u32 pseudo_palette[16];
 };
 
@@ -460,6 +468,86 @@ static int ftlcdc100_set_par(struct fb_info *info)
 }
 
 /**
+ * ftlcdc100_setcolreg - Optional function. Sets a color register.
+ * @regno: Which register in the CLUT we are programming 
+ * @red: The red value which can be up to 16 bits wide 
+ * @green: The green value which can be up to 16 bits wide 
+ * @blue:  The blue value which can be up to 16 bits wide.
+ * @transp: If supported, the alpha value which can be up to 16 bits wide.
+ * @info: frame buffer info structure
+ * 
+ * Set a single color register. The values supplied have a 16 bit
+ * magnitude which needs to be scaled in this function for the hardware. 
+ * Things to take into consideration are how many color registers, if
+ * any, are supported with the current color visual. With truecolor mode
+ * no color palettes are supported. Here a pseudo palette is created
+ * which we store the value in pseudo_palette in struct fb_info. For
+ * pseudocolor mode we have a limited color palette. To deal with this
+ * we can program what color is displayed for a particular pixel value.
+ * DirectColor is similar in that we can program each color field. If
+ * we have a static colormap we don't need to implement this function. 
+ * 
+ * Returns negative errno on error, or zero on success.
+ */
+static int ftlcdc100_setcolreg(unsigned regno, unsigned red, unsigned green,
+	unsigned blue, unsigned transp, struct fb_info *info)
+{
+	struct ftlcdc100 *ftlcdc100 = info->par;
+	u32 val;
+
+	dev_dbg(info->device, "%s(%d, %d, %d, %d, %d)\n", __func__,
+		regno, red, green, blue, transp);
+
+	if (regno >= 256)  /* no. of hw registers */
+		return -EINVAL;
+
+	/*
+	 * If grayscale is true, then we convert the RGB value
+	 * to grayscale no mater what visual we are using.
+	 */
+	if (info->var.grayscale) {
+		/* grayscale = 0.30*R + 0.59*G + 0.11*B */
+		red = green = blue = (red * 77 + green * 151 + blue * 28) >> 8;
+	}
+
+#define CNVT_TOHW(val,width) ((((val) << (width)) + 0x7FFF - (val)) >> 16)
+	red = CNVT_TOHW(red, info->var.red.length);
+	green = CNVT_TOHW(green, info->var.green.length);
+	blue = CNVT_TOHW(blue, info->var.blue.length);
+	transp = CNVT_TOHW(transp, info->var.transp.length);
+#undef CNVT_TOHW
+
+	switch (info->fix.visual) {
+	case FB_VISUAL_TRUECOLOR:
+		if (regno >= 16)
+			return -EINVAL;
+		/*
+		 * The contents of the pseudo_palette is in raw pixel format.
+		 * Ie, each entry can be written directly to the framebuffer
+		 * without any conversion.
+		 */
+	
+		val = (red << info->var.red.offset);
+		val |= (green << info->var.green.offset);
+		val |= (blue << info->var.blue.offset);
+
+		ftlcdc100->pseudo_palette[regno] = val;
+
+		break;
+
+	case FB_VISUAL_STATIC_PSEUDOCOLOR:
+	case FB_VISUAL_PSEUDOCOLOR:
+		/* TODO set palette registers */
+		break;
+
+	default:
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+/**
  * ftlcdc100_pan_display - NOT a required function. Pans the display.
  * @var: frame buffer variable screen structure
  * @info: frame buffer structure that represents a single frame buffer
@@ -491,6 +579,7 @@ static struct fb_ops ftlcdc100_fb_ops = {
 	.owner		= THIS_MODULE,
 	.fb_check_var	= ftlcdc100_check_var,
 	.fb_set_par	= ftlcdc100_set_par,
+	.fb_setcolreg	= ftlcdc100_setcolreg,
 	.fb_pan_display	= ftlcdc100_pan_display,
 
 	/* These are generic software based fb functions */

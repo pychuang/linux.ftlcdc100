@@ -48,4 +48,26 @@ $ cat /sys/class/graphics/fb0/dev
 
 $ mknod /dev/fb0 c 29 0
 
+******************************************************************************
+fbcon (framebuffer console) HOWTO:
+
+(1) make sure the following config options are set
+
+* virtual terminal
+
+CONFIG_VT=y
+CONFIG_VT_CONSOLE=y
+
+* framebuffer console
+
+CONFIG_FRAMEBUFFER_CONSOLE=y
+
+* boot logo
+
+CONFIG_LOGO=y
+CONFIG_LOGO_LINUX_CLUT224=y
+
+(2) add framebuffer console to kernel command line (you can use it with serial console)
+
+console=tty0
 
