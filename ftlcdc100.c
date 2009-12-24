@@ -294,14 +294,17 @@ static int ftlcdc100_check_var(struct fb_var_screeninfo *var,
 		var->red.length		= 5;
 		var->green.length	= 6;
 		var->blue.length	= 5;
+		var->transp.length	= 0;
 		break;
 
-	case 24:	/* RGB:888 mode */
-		var->red.offset		= 0;
+	case 32:	/* RGB:888 mode */
+		var->red.offset		= 16;
 		var->green.offset	= 8;
-		var->blue.offset	= 16;
+		var->blue.offset	= 0;
+		var->transp.offset	= 24;
 
 		var->red.length = var->green.length = var->blue.length = 8;
+		var->transp.length	= 8;
 		break;
 
 	default:
@@ -452,7 +455,7 @@ static int ftlcdc100_set_par(struct fb_info *info)
 			reg |= FTLCDC100_LCD_CONTROL_BPP16;
 			break;
 
-		case 24:
+		case 32:
 			reg |= FTLCDC100_LCD_CONTROL_BPP24;
 			break;
 
