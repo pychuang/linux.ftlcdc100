@@ -766,8 +766,8 @@ err_alloc_cmap:
 	platform_set_drvdata(pdev, NULL);
 	framebuffer_release(info);
 err_alloc_info:
-	release_resource(res);
 err_get_irq:
+	release_resource(res);
 	return ret;
 }
 
