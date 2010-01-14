@@ -35,12 +35,6 @@
 #define LC_CLK	AHB_CLK_IN
 
 /*
- * Andoird uses a virtual display twice the size of the physical screen and
- * use fb_pan_display() to achieve double buffering.
- */
-#define CONFIG_NUMBER_OF_BUFFERS	2
-
-/*
  * Select a panel configuration
  */
 #undef CONFIG_SHARP_LQ057Q3DC02
@@ -90,7 +84,7 @@ static struct fb_var_screeninfo ftlcdc100_default_var __devinitdata = {
 	.xres		= 320,
 	.yres		= 240,
 	.xres_virtual	= 320,
-	.yres_virtual	= 240 * CONFIG_NUMBER_OF_BUFFERS,
+	.yres_virtual	= 240,
 	.bits_per_pixel	= 16,
 	.pixclock	= 171521,
 	.left_margin	= 17,
@@ -108,7 +102,7 @@ static struct fb_var_screeninfo ftlcdc100_default_var __devinitdata = {
 	.xres		= 320,
 	.yres		= 240,
 	.xres_virtual	= 320,
-	.yres_virtual	= 240 * CONFIG_NUMBER_OF_BUFFERS,
+	.yres_virtual	= 240,
 	.bits_per_pixel	= 16,
 	.pixclock	= 171521,
 	.left_margin	= 44,
@@ -126,7 +120,7 @@ static struct fb_var_screeninfo ftlcdc100_default_var __devinitdata = {
 	.xres		= 640,
 	.yres		= 480,
 	.xres_virtual	= 640,
-	.yres_virtual	= 480 * CONFIG_NUMBER_OF_BUFFERS,
+	.yres_virtual	= 480,
 	.bits_per_pixel	= 16,
 	.pixclock	= 171521,
 	.left_margin	= 44,
@@ -139,6 +133,59 @@ static struct fb_var_screeninfo ftlcdc100_default_var __devinitdata = {
 	.sync		= 0,
 };
 #endif
+
+/******************************************************************************
+ * internal functions
+ *****************************************************************************/
+static int ftlcdc100_grow_framebuffer(struct fb_info *info,
+	struct fb_var_screeninfo *var)
+{
+	struct device *dev = info->device;
+	struct ftlcdc100 *ftlcdc100 = info->par;
+	unsigned int reg;
+	unsigned long smem_len = (var->xres_virtual * var->yres_virtual
+				 * DIV_ROUND_UP(var->bits_per_pixel, 8));
+	unsigned long smem_start;
+	void *screen_base;
+
+	if (smem_len <= info->fix.smem_len) {
+		/* current framebuffer is big enough */
+		return 0;
+	}
+
+	/*
+	 * Allocate bigger framebuffer
+	 */
+	screen_base = dma_alloc_writecombine(NULL, smem_len,
+				(dma_addr_t *)&smem_start,
+				GFP_KERNEL | GFP_DMA);
+
+	if (!screen_base) {
+		dev_err(dev, "Failed to allocate frame buffer\n");
+		return -ENOMEM;
+	}
+
+	memset(screen_base, 0, smem_len);
+	dev_dbg(dev, "  frame buffer: vitual = %p, physical = %08lx\n",
+		screen_base, smem_start);
+
+	reg = FTLCDC100_LCD_FRAME_BASE(smem_start);
+	iowrite32(reg, ftlcdc100->base + FTLCDC100_OFFSET_LCD_FRAME_BASE);
+
+	/*
+	 * Free current framebuffer (if any)
+	 */
+	if (info->screen_base) {
+		dma_free_writecombine(NULL, info->fix.smem_len,
+			info->screen_base, (dma_addr_t )info->fix.smem_start);
+	}
+
+	info->screen_base = screen_base;
+	info->fix.smem_start = smem_start;
+	info->fix.smem_len = smem_len;
+
+	return 0;
+}
 
 /******************************************************************************
  * interrupt handler
@@ -222,6 +269,7 @@ static int ftlcdc100_check_var(struct fb_var_screeninfo *var,
 {
 	struct device *dev = info->device;
 	unsigned long clk_value_khz;
+	int ret;
 
 	clk_value_khz = LC_CLK / 1000;
 
@@ -233,8 +281,8 @@ static int ftlcdc100_check_var(struct fb_var_screeninfo *var,
 	}
 
 	dev_dbg(dev, "  resolution: %ux%u (%ux%u virtual)\n",
-		info->var.xres, info->var.yres,
-		info->var.xres_virtual, info->var.yres_virtual);
+		var->xres, var->yres,
+		var->xres_virtual, var->yres_virtual);
 	dev_dbg(dev, "  pixclk:       %lu KHz\n", PICOS2KHZ(var->pixclock));
 	dev_dbg(dev, "  bpp:          %u\n", var->bits_per_pixel);
 	dev_dbg(dev, "  clk:          %lu KHz\n", clk_value_khz);
@@ -264,20 +312,12 @@ static int ftlcdc100_check_var(struct fb_var_screeninfo *var,
 	if (var->xres_virtual != info->var.xres)
 		return -EINVAL;
 
-	if (var->yres_virtual > info->var.yres_virtual)
-		return -EINVAL;
-
 	if (var->yres_virtual < info->var.yres)
 		return -EINVAL;
 
-	if (info->fix.smem_len) {
-		unsigned int smem_len = (var->xres_virtual * var->yres_virtual
-					 * DIV_ROUND_UP(var->bits_per_pixel, 8));
-		if (smem_len > info->fix.smem_len) {
-			dev_err(dev, "Frame buffer too small\n");
-			return -EINVAL;
-		}
-	}
+	ret = ftlcdc100_grow_framebuffer(info, var);
+	if (ret)
+		return ret;
 
 	switch (var->bits_per_pixel) {
 	case 1: case 2: case 4: case 8:
@@ -680,26 +720,6 @@ static int __init ftlcdc100_probe(struct platform_device *pdev)
 	}
 
 	/*
-	 * Allocate framebuffer
-	 */
-	info->fix.smem_len = info->var.xres_virtual * info->var.yres_virtual
-			     * DIV_ROUND_UP(info->var.bits_per_pixel, 8);
-
-	info->screen_base = dma_alloc_writecombine(NULL, info->fix.smem_len,
-				(dma_addr_t *)&info->fix.smem_start,
-				GFP_KERNEL | GFP_DMA);
-
-	if (!info->screen_base) {
-		dev_err(dev, "Failed to allocate frame buffer\n");
-		ret = -ENOMEM;
-		goto err_alloc_framebuffer;
-	}
-
-	memset(info->screen_base, 0, info->fix.smem_len);
-	dev_dbg(dev, "  frame buffer: vitual = %p, physical = %08lx\n",
-		info->screen_base, info->fix.smem_start);
-
-	/*
 	 * Register interrupt handler
 	 */
 	ret = request_irq(irq, ftlcdc100_interrupt, IRQF_SHARED, pdev->name, info);
@@ -709,13 +729,6 @@ static int __init ftlcdc100_probe(struct platform_device *pdev)
 	}
 
 	ftlcdc100->irq = irq;
-
-	/*
-	 * Because ftlcdc100_set_par() starts DMA, we need to setup frame base
-	 * register before calling it.
-	 */
-	reg = FTLCDC100_LCD_FRAME_BASE(info->fix.smem_start);
-	iowrite32(reg, ftlcdc100->base + FTLCDC100_OFFSET_LCD_FRAME_BASE);
 
 	/*
 	 * Enable interrupts
@@ -756,7 +769,6 @@ err_register_info:
 err_req_irq:
 	dma_free_writecombine(NULL, info->fix.smem_len, info->screen_base,
 				(dma_addr_t )info->fix.smem_start);
-err_alloc_framebuffer:
 err_check_var:
 	iounmap(ftlcdc100->base);
 err_ioremap:
