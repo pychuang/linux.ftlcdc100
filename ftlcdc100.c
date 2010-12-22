@@ -639,7 +639,7 @@ static struct fb_ops ftlcdc100_fb_ops = {
 /******************************************************************************
  * struct platform_driver functions
  *****************************************************************************/
-static int __init ftlcdc100_probe(struct platform_device *pdev)
+static int __devinit ftlcdc100_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	struct ftlcdc100 *ftlcdc100;
@@ -788,7 +788,7 @@ err_get_irq:
 	return ret;
 }
 
-static int __exit ftlcdc100_remove(struct platform_device *pdev)
+static int __devexit ftlcdc100_remove(struct platform_device *pdev)
 {
 	struct fb_info *info;
 	struct ftlcdc100 *ftlcdc100;
@@ -818,7 +818,7 @@ static int __exit ftlcdc100_remove(struct platform_device *pdev)
 
 static struct platform_driver ftlcdc100_driver = {
 	.probe		= ftlcdc100_probe,
-	.remove		= __exit_p(ftlcdc100_remove),
+	.remove		= __devexit_p(ftlcdc100_remove),
 
 	.driver		= {
 		.name	= "ftlcdc100",
