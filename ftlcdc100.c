@@ -19,6 +19,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+#include <linux/clk.h>
 #include <linux/kernel.h>
 #include <linux/platform_device.h>
 #include <linux/dma-mapping.h>
@@ -27,12 +28,6 @@
 #include <linux/init.h>
 
 #include "ftlcdc100.h"
-
-/*
- * Actually, I don't know if LC_CLK is AHB clock on A320.  It is not written
- * in A320 data sheet.
- */
-#define LC_CLK	AHB_CLK_IN
 
 /*
  * Select a panel configuration
@@ -52,6 +47,8 @@ struct ftlcdc100 {
 	struct resource *res;
 	void *base;
 	int irq;
+	struct clk *clk;
+	unsigned long clk_value_khz;
 
 	/*
 	 * This pseudo_palette is used _only_ by fbcon, thus
@@ -269,10 +266,9 @@ static int ftlcdc100_check_var(struct fb_var_screeninfo *var,
 		struct fb_info *info)
 {
 	struct device *dev = info->device;
-	unsigned long clk_value_khz;
+	struct ftlcdc100 *ftlcdc100 = info->par;
+	unsigned long clk_value_khz = ftlcdc100->clk_value_khz;
 	int ret;
-
-	clk_value_khz = LC_CLK / 1000;
 
 	dev_dbg(dev, "%s:\n", __func__);
 
@@ -385,7 +381,7 @@ static int ftlcdc100_check_var(struct fb_var_screeninfo *var,
 static int ftlcdc100_set_par(struct fb_info *info)
 {
 	struct ftlcdc100 *ftlcdc100 = info->par;
-	unsigned long clk_value_khz;
+	unsigned long clk_value_khz = ftlcdc100->clk_value_khz;
 	unsigned int divno;
 	unsigned int reg;
 
@@ -410,8 +406,6 @@ static int ftlcdc100_set_par(struct fb_info *info)
 	/*
 	 * LCD clock and signal polarity control
 	 */
-	clk_value_khz = LC_CLK / 1000;
-
 	divno = DIV_ROUND_UP(clk_value_khz, PICOS2KHZ(info->var.pixclock));
 	if (divno == 0) {
 		dev_err(info->device,
@@ -645,6 +639,7 @@ static int __devinit ftlcdc100_probe(struct platform_device *pdev)
 	struct ftlcdc100 *ftlcdc100;
 	struct resource *res;
 	struct fb_info *info;
+	struct clk *clk;
 	unsigned int reg;
 	int irq;
 	int ret;
@@ -693,6 +688,21 @@ static int __devinit ftlcdc100_probe(struct platform_device *pdev)
 		dev_err(dev, "Failed to allocate colormap\n");
 		goto err_alloc_cmap;
 	}
+
+	/*
+	 * In fact, I don't know if LC_CLK is AHB clock on A320.  It is not
+	 * written in A320 data sheet.
+	 */
+	clk = clk_get(NULL, "hclk");
+	if (IS_ERR(clk)) {
+		dev_err(dev, "Failed to get clock\n");
+		ret = PTR_ERR(clk);
+		goto err_clk_get;
+	}
+
+	clk_enable(clk);
+	ftlcdc100->clk = clk;
+	ftlcdc100->clk_value_khz = clk_get_rate(clk) / 1000;
 
 	/*
 	 * Map io memory
@@ -778,6 +788,8 @@ err_check_var:
 	iounmap(ftlcdc100->base);
 err_ioremap:
 err_req_mem_region:
+	clk_put(clk);
+err_clk_get:
 	fb_dealloc_cmap(&info->cmap);
 err_alloc_cmap:
 	platform_set_drvdata(pdev, NULL);
@@ -808,6 +820,7 @@ static int __devexit ftlcdc100_remove(struct platform_device *pdev)
 
 	iounmap(ftlcdc100->base);
 
+	clk_put(ftlcdc100->clk);
 	fb_dealloc_cmap(&info->cmap);
 	platform_set_drvdata(pdev, NULL);
 	framebuffer_release(info);
