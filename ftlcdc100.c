@@ -132,6 +132,7 @@ static struct fb_var_screeninfo ftlcdc100_default_var __devinitdata = {
 	.vmode		= FB_VMODE_NONINTERLACED,
 	.sync		= 0,
 };
+#define CONFIG_FTLCDC100_LCD_CLOCK_POLARITY_ICK
 #endif
 
 /******************************************************************************
@@ -433,6 +434,10 @@ static int ftlcdc100_set_par(struct fb_info *info)
 
 	reg = FTLCDC100_LCD_CLOCK_POLARITY_DIVNO(divno - 1)
 	    | FTLCDC100_LCD_CLOCK_POLARITY_ADPEN;
+
+#ifdef CONFIG_FTLCDC100_LCD_CLOCK_POLARITY_ICK
+	reg |= FTLCDC100_LCD_CLOCK_POLARITY_ICK;
+#endif
 
 	if ((info->var.sync & FB_SYNC_HOR_HIGH_ACT) == 0)
 		reg |= FTLCDC100_LCD_CLOCK_POLARITY_IHS;
