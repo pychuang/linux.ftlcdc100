@@ -191,6 +191,7 @@ static int ftlcdc100_grow_framebuffer(struct fb_info *info,
 static irqreturn_t ftlcdc100_interrupt(int irq, void *dev_id)
 {
 	struct fb_info *info = dev_id;
+	struct device *dev = info->device;
 	struct ftlcdc100 *ftlcdc100 = info->par;
 	unsigned int status;
 
@@ -198,23 +199,23 @@ static irqreturn_t ftlcdc100_interrupt(int irq, void *dev_id)
 
 	if (status & FTLCDC100_LCD_INT_UNDERRUN) {
 		if (printk_ratelimit())
-			dev_notice(info->device, "underrun\n");
+			dev_notice(dev, "underrun\n");
 	}
 
 	if (status & FTLCDC100_LCD_INT_NEXT_BASE) {
 		if (printk_ratelimit())
-			dev_dbg(info->device, "frame base updated\n");
+			dev_dbg(dev, "frame base updated\n");
 	}
 
 	if (status & FTLCDC100_LCD_INT_VSTATUS) {
 		if (printk_ratelimit())
-			dev_dbg(info->device, "vertical duration reached \n");
+			dev_dbg(dev, "vertical duration reached \n");
 
 	}
 
 	if (status & FTLCDC100_LCD_INT_BUS_ERROR) {
 		if (printk_ratelimit())
-			dev_err(info->device, "bus error!\n");
+			dev_err(dev, "bus error!\n");
 
 	}
 
@@ -380,13 +381,14 @@ static int ftlcdc100_check_var(struct fb_var_screeninfo *var,
  */
 static int ftlcdc100_set_par(struct fb_info *info)
 {
+	struct device *dev = info->device;
 	struct ftlcdc100 *ftlcdc100 = info->par;
 	unsigned long clk_value_khz = ftlcdc100->clk_value_khz;
 	unsigned int divno;
 	unsigned int reg;
 
-	dev_dbg(info->device, "%s:\n", __func__);
-	dev_dbg(info->device, "  resolution:     %ux%u (%ux%u virtual)\n",
+	dev_dbg(dev, "%s:\n", __func__);
+	dev_dbg(dev, "  resolution:     %ux%u (%ux%u virtual)\n",
 		info->var.xres, info->var.yres,
 		info->var.xres_virtual, info->var.yres_virtual);
 
@@ -408,18 +410,17 @@ static int ftlcdc100_set_par(struct fb_info *info)
 	 */
 	divno = DIV_ROUND_UP(clk_value_khz, PICOS2KHZ(info->var.pixclock));
 	if (divno == 0) {
-		dev_err(info->device,
-			"pixel clock(%lu kHz) > bus clock(%lu kHz)\n",
+		dev_err(dev, "pixel clock(%lu kHz) > bus clock(%lu kHz)\n",
 			PICOS2KHZ(info->var.pixclock), clk_value_khz);
 		return -EINVAL;
 	}
 
 	clk_value_khz = DIV_ROUND_UP(clk_value_khz, divno);
 	info->var.pixclock = KHZ2PICOS(clk_value_khz);
-	dev_dbg(info->device, "  updated pixclk: %lu KHz (divno = %x)\n",
+	dev_dbg(dev, "  updated pixclk: %lu KHz (divno = %x)\n",
 		clk_value_khz, divno - 1);
 
-	dev_dbg(info->device, "  frame rate:     %lu Hz\n",
+	dev_dbg(dev, "  frame rate:     %lu Hz\n",
 		clk_value_khz * 1000
 		/ (info->var.xres + info->var.left_margin
 			+ info->var.right_margin + info->var.hsync_len)
@@ -439,7 +440,7 @@ static int ftlcdc100_set_par(struct fb_info *info)
 	if ((info->var.sync & FB_SYNC_VERT_HIGH_ACT) == 0)
 		reg |= FTLCDC100_LCD_CLOCK_POLARITY_IVS;
 
-	dev_dbg(info->device, "  [LCD CLOCK POLARITY] = %08x\n", reg);
+	dev_dbg(dev, "  [LCD CLOCK POLARITY] = %08x\n", reg);
 	iowrite32(reg, ftlcdc100->base + FTLCDC100_OFFSET_LCD_CLOCK_POLARITY);
 
 	/*
@@ -450,7 +451,7 @@ static int ftlcdc100_set_par(struct fb_info *info)
 	reg |= FTLCDC100_LCD_HTIMING_HFP(info->var.right_margin - 1);
 	reg |= FTLCDC100_LCD_HTIMING_HBP(info->var.left_margin - 1);
 
-	dev_dbg(info->device, "  [LCD HTIMING] = %08x\n", reg);
+	dev_dbg(dev, "  [LCD HTIMING] = %08x\n", reg);
 	iowrite32(reg, ftlcdc100->base + FTLCDC100_OFFSET_LCD_HTIMING);
 
 	/*
@@ -461,7 +462,7 @@ static int ftlcdc100_set_par(struct fb_info *info)
 	reg |= FTLCDC100_LCD_VTIMING_VFP(info->var.lower_margin);
 	reg |= FTLCDC100_LCD_VTIMING_VBP(info->var.upper_margin);
 
-	dev_dbg(info->device, "  [LCD VTIMING] = %08x\n", reg);
+	dev_dbg(dev, "  [LCD VTIMING] = %08x\n", reg);
 	iowrite32(reg, ftlcdc100->base + FTLCDC100_OFFSET_LCD_VTIMING);
 
 	/*
@@ -503,7 +504,7 @@ static int ftlcdc100_set_par(struct fb_info *info)
 			break;
 	}
 
-	dev_dbg(info->device, "  [LCD CONTROL] = %08x\n", reg);
+	dev_dbg(dev, "  [LCD CONTROL] = %08x\n", reg);
 	iowrite32(reg, ftlcdc100->base + FTLCDC100_OFFSET_LCD_CONTROL);
 
 	return 0;
@@ -534,10 +535,11 @@ static int ftlcdc100_set_par(struct fb_info *info)
 static int ftlcdc100_setcolreg(unsigned regno, unsigned red, unsigned green,
 	unsigned blue, unsigned transp, struct fb_info *info)
 {
+	struct device *dev = info->device;
 	struct ftlcdc100 *ftlcdc100 = info->par;
 	u32 val;
 
-	dev_dbg(info->device, "%s(%d, %d, %d, %d, %d)\n", __func__,
+	dev_dbg(dev, "%s(%d, %d, %d, %d, %d)\n", __func__,
 		regno, red, green, blue, transp);
 
 	if (regno >= 256)  /* no. of hw registers */
@@ -603,17 +605,18 @@ static int ftlcdc100_setcolreg(unsigned regno, unsigned red, unsigned green,
 static int ftlcdc100_pan_display(struct fb_var_screeninfo *var,
 			       struct fb_info *info)
 {
+	struct device *dev = info->device;
 	struct ftlcdc100 *ftlcdc100 = info->par;
 	unsigned long dma_addr;
 	unsigned int value;
 
-	dev_dbg(info->device, "%s\n", __func__);
+	dev_dbg(dev, "%s\n", __func__);
 
 	dma_addr = info->fix.smem_start + var->yoffset * info->fix.line_length;
 	value = FTLCDC100_LCD_FRAME_BASE(dma_addr);
 
 	iowrite32(value, ftlcdc100->base + FTLCDC100_OFFSET_LCD_FRAME_BASE);
-	dev_dbg(info->device, "  [LCD FRAME BASE] = %08x\n", value);
+	dev_dbg(dev, "  [LCD FRAME BASE] = %08x\n", value);
 	return 0;
 }
 
