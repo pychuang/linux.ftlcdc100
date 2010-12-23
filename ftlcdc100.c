@@ -154,7 +154,7 @@ static int ftlcdc100_grow_framebuffer(struct fb_info *info,
 	/*
 	 * Allocate bigger framebuffer
 	 */
-	screen_base = dma_alloc_writecombine(NULL, smem_len,
+	screen_base = dma_alloc_writecombine(dev, smem_len,
 				(dma_addr_t *)&smem_start,
 				GFP_KERNEL | GFP_DMA);
 
@@ -174,7 +174,7 @@ static int ftlcdc100_grow_framebuffer(struct fb_info *info,
 	 * Free current framebuffer (if any)
 	 */
 	if (info->screen_base) {
-		dma_free_writecombine(NULL, info->fix.smem_len,
+		dma_free_writecombine(dev, info->fix.smem_len,
 			info->screen_base, (dma_addr_t )info->fix.smem_start);
 	}
 
@@ -782,7 +782,7 @@ err_register_info:
 	iowrite32(0, ftlcdc100->base + FTLCDC100_OFFSET_LCD_CONTROL);
 	free_irq(irq, info);
 err_req_irq:
-	dma_free_writecombine(NULL, info->fix.smem_len, info->screen_base,
+	dma_free_writecombine(dev, info->fix.smem_len, info->screen_base,
 				(dma_addr_t )info->fix.smem_start);
 err_check_var:
 	iounmap(ftlcdc100->base);
@@ -803,9 +803,11 @@ err_get_irq:
 static int __devexit ftlcdc100_remove(struct platform_device *pdev)
 {
 	struct fb_info *info;
+	struct device *dev;
 	struct ftlcdc100 *ftlcdc100;
 
 	info = platform_get_drvdata(pdev);
+	dev = info->device;
 	ftlcdc100 = info->par;
 
 	/* disable LCD HW */
@@ -815,7 +817,7 @@ static int __devexit ftlcdc100_remove(struct platform_device *pdev)
 	unregister_framebuffer(info);
 	free_irq(ftlcdc100->irq, info);
 
-	dma_free_writecombine(NULL, info->fix.smem_len, info->screen_base,
+	dma_free_writecombine(dev, info->fix.smem_len, info->screen_base,
 				(dma_addr_t )info->fix.smem_start);
 
 	iounmap(ftlcdc100->base);
