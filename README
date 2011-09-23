@@ -6,26 +6,24 @@ Usage:
 
 * put the following code in your platform-dpendent initialization sequence.
 ------------------------>8-------------------------->8------------------------
-static struct resource ftlcdc100_resources[] = {
+static struct resource ftlcdc100_0_resources[] = {
 	{
-		.start	= LCD_FTLCDC100_0_PA_BASE,
-		.end	= LCD_FTLCDC100_0_PA_LIMIT,
+		.start	= A320_FTLCDC100_0_PA_BASE,
+		.end	= A320_FTLCDC100_0_PA_BASE + SZ_4K - 1,
 		.flags	= IORESOURCE_MEM,
 	}, {
-		.start	= LCD_FTLCDC100_0_IRQ,
-		.end	= LCD_FTLCDC100_0_IRQ,
+		.start	= IRQ_A320_FTLCDC100_0,
 		.flags	= IORESOURCE_IRQ,
 	},
 };
 
-static struct platform_device ftlcdc100_device = {
+static struct platform_device ftlcdc100_0_device = {
 	.name		= "ftlcdc100",
-	.id		= 0,
-	.num_resources	= ARRAY_SIZE(ftlcdc100_resources),
-	.resource	= ftlcdc100_resources,
+	.num_resources	= ARRAY_SIZE(ftlcdc100_0_resources),
+	.resource	= ftlcdc100_0_resources,
 };
 
-platform_device_register(&ftlcdc100_device);
+platform_device_register(&ftlcdc100_0_device);
 ------------------------>8-------------------------->8------------------------
 
 * make sure the following config options are set
